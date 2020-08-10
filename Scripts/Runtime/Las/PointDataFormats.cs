@@ -6,6 +6,7 @@ namespace PointCloud.LasFormat
 {
     public struct PointDataFormatBase
     {
+
         public int x;
         public int y;
         public int z;
@@ -92,6 +93,8 @@ namespace PointCloud.LasFormat
 
     public struct PointDataFormat
     {
+        public delegate int PointReadDelegatge(ref PointDataFormat obj, FileReader reader);
+
         public PointDataFormatBase baseData;
         public double GPSTime;
         public PointColorInfo colorInfo;
@@ -99,72 +102,114 @@ namespace PointCloud.LasFormat
         public WaveInfo waveInfo;
 
 
-        public void ReadAsFormat0(FileReader reader)
+        public static PointReadDelegatge GetReadAction(byte format)
         {
-            baseData.Read(reader, true);
+            switch (format)
+            {
+                case 0:
+                    return ReadAsFormat0;
+                case 1:
+                    return ReadAsFormat1;
+                case 2:
+                    return ReadAsFormat2;
+                case 3:
+                    return ReadAsFormat3;
+                case 4:
+                    return ReadAsFormat4;
+                case 5:
+                    return ReadAsFormat5;
+                case 6:
+                    return ReadAsFormat6;
+                case 7:
+                    return ReadAsFormat7;
+                case 8:
+                    return ReadAsFormat8;
+                case 9:
+                    return ReadAsFormat9;
+                case 10:
+                    return ReadAsFormat10;
+            }
+            return ReadAsFormat0;
         }
 
-        public void ReadAsFormat1(FileReader reader)
+        private static int ReadAsFormat0(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, true);
-            GPSTime = reader.ReadDouble();
+            obj.baseData.Read(reader, true);
+            return 0;
         }
-        public void ReadAsFormat2(FileReader reader)
+
+        private static int ReadAsFormat1(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, true);
-            colorInfo.Read(reader);
+            obj.baseData.Read(reader, true);
+            obj.GPSTime = reader.ReadDouble();
+            return 0;
         }
-        public void ReadAsFormat3(FileReader reader)
+        private static int ReadAsFormat2(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, true);
-            GPSTime = reader.ReadDouble();
-            colorInfo.Read(reader);
+            obj.baseData.Read(reader, true);
+            obj.colorInfo.Read(reader);
+            return 0;
         }
-        public void ReadAsFormat4(FileReader reader)
+        private static int ReadAsFormat3(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, true);
-            GPSTime = reader.ReadDouble();
-            parametric.Read(reader);
-            waveInfo.Read(reader);
+            obj.baseData.Read(reader, true);
+            obj.GPSTime = reader.ReadDouble();
+            obj.colorInfo.Read(reader);
+
+            return 0;
         }
-        public void ReadAsFormat5(FileReader reader)
+        private static int ReadAsFormat4(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, true);
-            GPSTime = reader.ReadDouble();
-            colorInfo.Read(reader);
-            parametric.Read(reader);
-            waveInfo.Read(reader);
+            obj.baseData.Read(reader, true);
+            obj.GPSTime = reader.ReadDouble();
+            obj.parametric.Read(reader);
+            obj.waveInfo.Read(reader);
+            return 0;
         }
-        public void ReadAsFormat6(FileReader reader)
+        private static int ReadAsFormat5(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, false);
-            GPSTime = reader.ReadDouble();
+            obj.baseData.Read(reader, true);
+            obj.GPSTime = reader.ReadDouble();
+            obj.colorInfo.Read(reader);
+            obj.parametric.Read(reader);
+            obj.waveInfo.Read(reader);
+            return 0;
         }
-        public void ReadAsFormat7(FileReader reader)
+        private static int ReadAsFormat6(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, false);
-            colorInfo.Read(reader);
+            obj.baseData.Read(reader, false);
+            obj.GPSTime = reader.ReadDouble();
+            return 0;
         }
-        public void ReadAsFormat8(FileReader reader)
+        private static int ReadAsFormat7(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, false);
-            GPSTime = reader.ReadDouble();
-            colorInfo.Read(reader);
+            obj.baseData.Read(reader, false);
+            obj.colorInfo.Read(reader);
+            return 0;
         }
-        public void ReadAsFormat9(FileReader reader)
+        private static int ReadAsFormat8(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, false);
-            GPSTime = reader.ReadDouble();
-            parametric.Read(reader);
-            waveInfo.Read(reader);
+            obj.baseData.Read(reader, false);
+            obj.GPSTime = reader.ReadDouble();
+            obj.colorInfo.Read(reader);
+            return 0;
         }
-        public void ReadAsFormat10(FileReader reader)
+        private static int ReadAsFormat9(ref PointDataFormat obj, FileReader reader)
         {
-            baseData.Read(reader, false);
-            GPSTime = reader.ReadDouble();
-            colorInfo.Read(reader);
-            parametric.Read(reader);
-            waveInfo.Read(reader);
+            obj.baseData.Read(reader, false);
+            obj.GPSTime = reader.ReadDouble();
+            obj.parametric.Read(reader);
+            obj.waveInfo.Read(reader);
+            return 0;
+        }
+        private static int ReadAsFormat10(ref PointDataFormat obj, FileReader reader)
+        {
+            obj.baseData.Read(reader, false);
+            obj.GPSTime = reader.ReadDouble();
+            obj.colorInfo.Read(reader);
+            obj.parametric.Read(reader);
+            obj.waveInfo.Read(reader);
+            return 0;
         }
 
 

@@ -9,12 +9,15 @@ namespace PointCloud.LasFormat
         private FileReader reader;
         private PublicHeaderBlock header;
         private MeshGenerator meshGenerator;
+        private int reductionParam;
         private System.Threading.Thread thread;
-        public ThreadLoadExecutor(FileReader r, ref PublicHeaderBlock h, MeshGenerator mg)
+        public ThreadLoadExecutor(FileReader r, ref PublicHeaderBlock h, MeshGenerator mg, int rParam)
         {
             this.reader = r;
             this.header = h;
             this.meshGenerator = mg;
+            this.reductionParam = rParam-1;
+            if ( this.reductionParam < 0) { this.reductionParam = 0; }
         }
 
         public void StartExecute()
@@ -39,40 +42,24 @@ namespace PointCloud.LasFormat
             Color col;
 
             PointDataFormat pointData = new PointDataFormat();
-            switch (format)
+
+            var readFunc = PointDataFormat.GetReadAction(format);
+
+            for (ulong i = 0; i < num; ++i)
             {
-                case 0:
-                    break;
-                case 1:
-                    break;
-                case 2:
-                    break;
-                case 3:
-                    for (ulong i = 0; i < num; ++i)
-                    {
-                        pointData.ReadAsFormat3(reader);
-                        LasFileLoader.GetPointData(ref header, ref pointData, out point, out col);
-                        // append 出来るまで実行
-                        while (!meshGenerator.AddPointData(point, col))
-                        {
-                            System.Threading.Thread.Sleep(2);
-                        }
-                    }
-                    break;
-                case 4:
-                    break;
-                case 5:
-                    break;
-                case 6:
-                    break;
-                case 7:
-                    break;
-                case 8:
-                    break;
-                case 9:
-                    break;
-                case 10:
-                    break;
+                readFunc(ref pointData,reader);
+                LasLoadBehaviour.GetPointData(ref header, ref pointData, out point, out col);
+                // append 出来るまで実行
+                while (!meshGenerator.AddPointData(point, col))
+                {
+                    System.Threading.Thread.Sleep(2);
+                }
+                // reduction
+                if(this.reductionParam > 0)
+                {
+                    reader.Skip(this.reductionParam * header.pointDataRecordLength);
+                    i += (ulong)this.reductionParam;
+                }
             }
 
 

@@ -13,6 +13,36 @@ namespace PointCloud
             public ulong pointNum;
             public int bufferPoint;
             public int polyNum;
+            public System.Action<GameObject> onInstansiatePart;
+            public System.Action onComplete;
+
+            public void SetPointNum(ulong num,int reduction)
+            {
+                if (reduction > 1)
+                {
+                    this.pointNum = num / (ulong)reduction;
+                }
+                else
+                {
+                    this.pointNum = num;
+                }
+            }
+
+            public void Validate()
+            {
+                if (this.bufferPoint <= 0)
+                {
+                    this.bufferPoint = 200000;
+                }
+                if (this.polyNum < 3)
+                {
+                    this.polyNum = 3;
+                }
+                if (this.pointNum < (ulong)this.bufferPoint)
+                {
+                    this.bufferPoint = (int)this.pointNum;
+                }
+            }
         }
 
         private NativeArray<Vector3> pointBuffer;
@@ -28,20 +58,16 @@ namespace PointCloud
         private Transform parentTransform;
         private Material drawMaterial;
         private Config config;
-
         private Vector3[] normalVals;
+        private bool isComplete = false;
 
         public MeshGenerator(Transform parent, Material mat, Config conf)
         {
-            if (conf.pointNum < (ulong)conf.bufferPoint)
-            {
-                conf.bufferPoint = (int)conf.pointNum;
-            }
+            conf.Validate();
             this.drawMaterial = mat;
             this.parentTransform = parent;
             this.config = conf;
 
-            ulong pointNum = conf.pointNum * 3;
             InitNormalVals(conf.polyNum);
 
             this.vertBufferSize = conf.bufferPoint * conf.polyNum;
@@ -88,11 +114,12 @@ namespace PointCloud
 
         public bool AddPointData(Vector3 point, Color col)
         {
-            if (this.vertBufferSize <= currentVertPos)
+            if (this.isComplete) { return true; }
+            if (this.currentPointNum >= this.config.pointNum)
             {
-                return false;
+                return true;
             }
-            if( this.currentPointNum >= this.config.pointNum)
+            if (this.vertBufferSize <= currentVertPos)
             {
                 return false;
             }
@@ -111,6 +138,8 @@ namespace PointCloud
 
         public void UpdateFromMainThread()
         {
+            if(this.isComplete) { return; }
+
             if (this.vertBufferSize <= currentVertPos)
             {
                 CreateObject();
@@ -122,6 +151,10 @@ namespace PointCloud
                 CreateObject();
                 this.currentIndexPos = 0;
                 this.currentVertPos = 0;
+                // complete
+                this.isComplete = true;
+                this.config.onComplete?.Invoke();
+                this.ReleaseBuffers();
             }
         }
 
@@ -136,6 +169,7 @@ namespace PointCloud
             filter.mesh = GenerateMesh();
             var renderer = gmo.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = this.drawMaterial;
+            this.config.onInstansiatePart?.Invoke(gmo);
         }
 
         private Mesh GenerateMesh()
@@ -153,10 +187,25 @@ namespace PointCloud
 
         public void Dispose()
         {
-            normalBuffer.Dispose();
-            pointBuffer.Dispose();
-            colorBuffer.Dispose();
-            indexBuffer.Dispose();
+            ReleaseBuffers();
+        }
+        private void ReleaseBuffers() {
+            if (normalBuffer.IsCreated)
+            {
+                normalBuffer.Dispose();
+            }
+            if (pointBuffer.IsCreated)
+            {
+                pointBuffer.Dispose();
+            }
+            if (colorBuffer.IsCreated)
+            {
+                colorBuffer.Dispose();
+            }
+            if (indexBuffer.IsCreated)
+            {
+                indexBuffer.Dispose();
+            }
         }
     }
 

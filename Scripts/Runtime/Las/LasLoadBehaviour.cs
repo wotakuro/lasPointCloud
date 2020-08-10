@@ -1,44 +1,47 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using UnityEngine;
+﻿using UnityEngine;
 
 //
 // https://www.asprs.org/divisions-committees/lidar-division/laser-las-file-format-exchange-activities
 
 namespace PointCloud.LasFormat
 {
-    public class LasFileLoader : MonoBehaviour
+    public class LasLoader
     {
-        public string filaname;
+
+        public static GameObject Instantiate(string path, Material mat,int reductionParam = 1, MeshGenerator.Config conf = default)
+        {
+
+            GameObject gmo = new GameObject();
+            var lasLoader = gmo.AddComponent<LasLoadBehaviour>();
+            lasLoader.SetMaterial(mat);
+            lasLoader.LoadDataAsync(path, ref conf, reductionParam);
+            return gmo;
+        }
+
+        public static GameObject InstantiateSync(string path, Material mat, int reductionParam = 1, MeshGenerator.Config conf=default)
+        {
+
+            GameObject gmo = new GameObject();
+            var lasLoader = gmo.AddComponent<LasLoadBehaviour>();
+            lasLoader.SetMaterial(mat);
+            lasLoader.LoadDataSync(path, ref conf, reductionParam);
+            return gmo;
+        }
+    }
+
+    public class LasLoadBehaviour : MonoBehaviour
+    {
+        private string filaname;
         private Material material;
 
         private PublicHeaderBlock header;
         private MeshGenerator meshGenerator;
         private ThreadLoadExecutor threadLoadExecutor;
 
-        public static GameObject InstantiateAsync(string path,Material mat, int polyNum = 3,int bufferPoint= 200000)
+        internal void SetMaterial(Material mat)
         {
-            var conf = new MeshGenerator.Config { pointNum = 0, polyNum = polyNum, bufferPoint = bufferPoint };
-
-            GameObject gmo = new GameObject();
-            var lasLoader = gmo.AddComponent<LasFileLoader>();
-            lasLoader.material = mat;
-            lasLoader.LoadDataAsync(path,ref conf);
-            return gmo;
+            this.material = mat;
         }
-
-        public static GameObject Instantiate(string path, Material mat, int polyNum = 3, int bufferPoint = 200000)
-        {
-            var conf = new MeshGenerator.Config { pointNum = 0, polyNum = polyNum, bufferPoint = bufferPoint };
-
-            GameObject gmo = new GameObject();
-            var lasLoader = gmo.AddComponent<LasFileLoader>();
-            lasLoader.material = mat;
-            lasLoader.LoadData(path,ref conf);
-            return gmo;
-        }
-
 
         private void Update()
         {
@@ -62,13 +65,13 @@ namespace PointCloud.LasFormat
         }
 
 
-        private void LoadData(string path,ref MeshGenerator.Config conf)
+        internal void LoadDataSync(string path,ref MeshGenerator.Config conf, int reductionParam)
         {
             FileReader reader = new FileReader(path);
             ReadHeader(reader);
-            ReadBody(reader, ref header,ref conf);
+            ReadBody(reader, ref header,ref conf,reductionParam);
         }
-        private void LoadDataAsync(string path, ref MeshGenerator.Config conf)
+        internal void LoadDataAsync(string path, ref MeshGenerator.Config conf,int reductionParam)
         {
             FileReader reader = new FileReader(path);
             ReadHeader(reader);
@@ -76,9 +79,9 @@ namespace PointCloud.LasFormat
             byte format = header.pointDatRecordFormat;
             ulong num = header.legacyNumofPointRecords;
 
-            conf.pointNum = num;
+            conf.SetPointNum( num ,reductionParam);
             this.meshGenerator = new MeshGenerator(transform, material, conf);
-            this.threadLoadExecutor = new ThreadLoadExecutor(reader, ref this.header, meshGenerator);
+            this.threadLoadExecutor = new ThreadLoadExecutor(reader, ref this.header, meshGenerator,reductionParam);
             this.threadLoadExecutor.StartExecute();
         }
 
@@ -96,53 +99,37 @@ namespace PointCloud.LasFormat
         }
 
 
-        private void ReadBody(FileReader reader,ref PublicHeaderBlock header, ref MeshGenerator.Config conf)
+        private void ReadBody(FileReader reader,ref PublicHeaderBlock header, ref MeshGenerator.Config conf,int reductionParam)
         {
             byte format = header.pointDatRecordFormat;
             ulong num = header.legacyNumofPointRecords;
             Vector3 point;
             Color col;
 
-            conf.pointNum = num;
+            conf.SetPointNum( num , reductionParam);
             this.meshGenerator = new MeshGenerator(transform,material, conf);
 
             PointDataFormat pointData = new PointDataFormat();
-            switch (format)
+
+            var readFunc = PointDataFormat.GetReadAction(format);
+
+            for (ulong i = 0; i < num; ++i)
             {
-                case 0:
-                    break;
-                case 1:
-                    break;
-                case 2:
-                    break;
-                case 3:
-                    for (ulong i = 0; i < num; ++i)
-                    {
-                        pointData.ReadAsFormat3(reader);
-                        GetPointData(ref header, ref pointData, out point, out col);
-                        if(!meshGenerator.AddPointData(point, col))
-                        {
-                            meshGenerator.UpdateFromMainThread();
-                            meshGenerator.AddPointData(point, col);
-                        }
-                    }
+                readFunc(ref pointData,reader);
+                GetPointData(ref header, ref pointData, out point, out col);
+                if (!meshGenerator.AddPointData(point, col))
+                {
                     meshGenerator.UpdateFromMainThread();
-                    break;
-                case 4:
-                    break;
-                case 5:
-                    break;
-                case 6:
-                    break;
-                case 7:
-                    break;
-                case 8:
-                    break;
-                case 9:
-                    break;
-                case 10:
-                    break;
+                    meshGenerator.AddPointData(point, col);
+                }
+                // reduction
+                if (reductionParam > 0)
+                {
+                    reader.Skip(reductionParam * header.pointDataRecordLength);
+                    i += (ulong)reductionParam;
+                }
             }
+            meshGenerator.UpdateFromMainThread();
 
         }
 
