@@ -14,7 +14,7 @@ https://pointcloud.pref.shizuoka.jp/
 ## 使用方法下記のような形です。
 <pre>
 int reductionParam=1;// リダクションするパラメーター。リダクションは単純に点の情報を何も考えず間引いているだけです。
-PointCloud.LasFormat.LasLoader.InstanciateAndAsyncLoad(lasのファイルパス, material, reductionParam);
+PointCloud.LasFormat.LasLoader.Instantiate(lasのファイルパス, material, reductionParam);
 
 
 ※Materialに割り当てるシェーダーは、Unlit/PointCloudシェーダーをお使い下さい。

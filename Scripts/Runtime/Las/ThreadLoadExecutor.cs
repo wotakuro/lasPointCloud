@@ -11,6 +11,26 @@ namespace PointCloud.LasFormat
         private MeshGenerator meshGenerator;
         private int reductionParam;
         private System.Threading.Thread thread;
+
+
+        private Vector3Double offsetPos;
+        private bool isSetOffset = false;
+
+        public Vector3Double OffsetPosition
+        {
+            get { return offsetPos; }
+            set
+            {
+                offsetPos = value;
+                isSetOffset = true;
+            }
+        }
+        public bool IsSetOffset
+        {
+            get { return isSetOffset; }
+        }
+
+
         public ThreadLoadExecutor(FileReader r, ref PublicHeaderBlock h, MeshGenerator mg, int rParam)
         {
             this.reader = r;
@@ -48,7 +68,13 @@ namespace PointCloud.LasFormat
             for (ulong i = 0; i < num; ++i)
             {
                 readFunc(ref pointData,reader);
-                LasLoadBehaviour.GetPointData(ref header, ref pointData, out point, out col);
+                if (!isSetOffset)
+                {
+                    LasLoadBehaviour.CalcOffsetVector3Double(out offsetPos,ref header, ref pointData);
+                    this.isSetOffset = true;
+                }
+
+                LasLoadBehaviour.GetPointData(ref header, ref pointData,ref offsetPos, out point, out col);
                 // append 出来るまで実行
                 while (!meshGenerator.AddPointData(point, col))
                 {
@@ -61,7 +87,6 @@ namespace PointCloud.LasFormat
                     i += (ulong)this.reductionParam;
                 }
             }
-
 
         }
     }

@@ -5,49 +5,57 @@
 
 namespace PointCloud.LasFormat
 {
-    public class LasLoader
-    {
-
-        public static GameObject Instantiate(string path, Material mat,int reductionParam = 1, MeshGenerator.Config conf = default)
-        {
-
-            GameObject gmo = new GameObject();
-            var lasLoader = gmo.AddComponent<LasLoadBehaviour>();
-            lasLoader.SetMaterial(mat);
-            lasLoader.LoadDataAsync(path, ref conf, reductionParam);
-            return gmo;
-        }
-
-        public static GameObject InstantiateSync(string path, Material mat, int reductionParam = 1, MeshGenerator.Config conf=default)
-        {
-
-            GameObject gmo = new GameObject();
-            var lasLoader = gmo.AddComponent<LasLoadBehaviour>();
-            lasLoader.SetMaterial(mat);
-            lasLoader.LoadDataSync(path, ref conf, reductionParam);
-            return gmo;
-        }
-    }
 
     public class LasLoadBehaviour : MonoBehaviour
     {
-        private string filaname;
         private Material material;
 
         private PublicHeaderBlock header;
         private MeshGenerator meshGenerator;
         private ThreadLoadExecutor threadLoadExecutor;
+        // double前提だとデータが壊れるので……最初に出てきたものにオフセットさせます
+        private Vector3Double offsetPos;
+        private bool isSetOffset = false;
+        private bool isAlreadyRequest = false;
 
-        internal void SetMaterial(Material mat)
+        private System.Action<LasLoadBehaviour> onComplete;
+
+        public Vector3Double OffsetPosition
+        {
+            get { return offsetPos; }
+            set {
+                offsetPos = value;
+                isSetOffset = true; 
+            }
+        }
+
+        public PublicHeaderBlock HeaderInfo
+        {
+            get { return header; }
+        }
+
+        
+
+        public void SetMaterial(Material mat)
         {
             this.material = mat;
         }
 
         private void Update()
         {
-            if(this.meshGenerator != null)
+            if (!this.isSetOffset && threadLoadExecutor != null 
+                && threadLoadExecutor.IsSetOffset)
+            {
+                this.OffsetPosition = threadLoadExecutor.OffsetPosition;
+            }
+            if (this.meshGenerator != null)
             {
                 this.meshGenerator.UpdateFromMainThread();
+                if (this.meshGenerator.IsComplete && onComplete != null)
+                {
+                    this.onComplete(this);
+                    this.onComplete = null;
+                }
             }
         }
         private void OnDestroy()
@@ -65,16 +73,21 @@ namespace PointCloud.LasFormat
         }
 
 
-        internal void LoadDataSync(string path,ref MeshGenerator.Config conf, int reductionParam)
+        public void LoadDataSync(string path,ref MeshGenerator.Config conf, int reductionParam)
         {
+            if (isAlreadyRequest) { return; }
             FileReader reader = new FileReader(path);
             ReadHeader(reader);
             ReadBody(reader, ref header,ref conf,reductionParam);
+            isAlreadyRequest = true;
         }
-        internal void LoadDataAsync(string path, ref MeshGenerator.Config conf,int reductionParam)
+        public void LoadDataAsync(string path, ref MeshGenerator.Config conf,int reductionParam,
+            System.Action<LasLoadBehaviour> completeCallback = null)
         {
+            if (isAlreadyRequest) { return; }
             FileReader reader = new FileReader(path);
             ReadHeader(reader);
+            this.onComplete = completeCallback;
 
             byte format = header.pointDatRecordFormat;
             ulong num = header.legacyNumofPointRecords;
@@ -83,6 +96,7 @@ namespace PointCloud.LasFormat
             this.meshGenerator = new MeshGenerator(transform, material, conf);
             this.threadLoadExecutor = new ThreadLoadExecutor(reader, ref this.header, meshGenerator,reductionParam);
             this.threadLoadExecutor.StartExecute();
+            isAlreadyRequest = true;
         }
 
         private void ReadHeader(FileReader reader)
@@ -112,11 +126,15 @@ namespace PointCloud.LasFormat
             PointDataFormat pointData = new PointDataFormat();
 
             var readFunc = PointDataFormat.GetReadAction(format);
-
             for (ulong i = 0; i < num; ++i)
             {
                 readFunc(ref pointData,reader);
-                GetPointData(ref header, ref pointData, out point, out col);
+                if (!isSetOffset)
+                {
+                    CalcOffsetVector3Double(out offsetPos, ref header, ref pointData);
+                    isSetOffset = true;
+                }
+                GetPointData(ref header, ref pointData,ref offsetPos, out point, out col);
                 if (!meshGenerator.AddPointData(point, col))
                 {
                     meshGenerator.UpdateFromMainThread();
@@ -129,17 +147,26 @@ namespace PointCloud.LasFormat
                     i += (ulong)reductionParam;
                 }
             }
-            meshGenerator.UpdateFromMainThread();
+            meshGenerator.UpdateFromMainThread(true);
 
         }
-
-
-        public static void GetPointData(ref PublicHeaderBlock header,ref PointDataFormat pointDataFormat,
-            out Vector3 pos,out Color col)
+        public static void CalcOffsetVector3Double(out Vector3Double offset, 
+            ref PublicHeaderBlock header, ref PointDataFormat pointDataFormat)
         {
             double x = (header.xScaleFactor * pointDataFormat.baseData.x);
             double y = (header.yScaleFactor * pointDataFormat.baseData.y);
             double z = (header.zScaleFactor * pointDataFormat.baseData.z);
+
+            offset = new Vector3Double(x, y, z);
+
+        }
+
+        public static void GetPointData(ref PublicHeaderBlock header,ref PointDataFormat pointDataFormat,
+            ref Vector3Double offset, out Vector3 pos,out Color col)
+        {
+            double x = (header.xScaleFactor * pointDataFormat.baseData.x) - offset.x;
+            double y = (header.yScaleFactor * pointDataFormat.baseData.y) - offset.y;
+            double z = (header.zScaleFactor * pointDataFormat.baseData.z) - offset.z;
 
             if (!pointDataFormat.baseData.ScanDirectionFlag)
             {

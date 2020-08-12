@@ -152,6 +152,41 @@ namespace PointCloud.LasFormat
             }
             return true;
         }
+#if DEBUG
+        public void DebugWriteToFile(string path)
+        {
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(1024);
+            sb.Append("version:").Append(versionMajaor).Append(".").Append(versionMinor).Append("\n");
+            sb.Append("headerSize:").Append(headerSize).Append("\n");
+            sb.Append("format:").Append(pointDatRecordFormat).Append("\n");
 
+            sb.Append("offsetToPointData:").Append(offsetToPointData).Append("\n");
+            sb.Append("numberOfLengthRecord:").Append(numberOfLengthRecord).Append("\n");
+            sb.Append("pointDataRecordLength:").Append(pointDataRecordLength).Append("\n");
+
+
+            sb.Append("xScaleFactor:").Append(xScaleFactor).Append("\n");
+            sb.Append("yScaleFactor:").Append(yScaleFactor).Append("\n");
+            sb.Append("zScaleFactor:").Append(zScaleFactor).Append("\n");
+
+            sb.Append("xOffset:").Append(xOffset).Append("\n");
+            sb.Append("yOffset:").Append(yOffset).Append("\n");
+            sb.Append("zOffset:").Append(zOffset).Append("\n");
+
+            sb.Append("XRange:").Append(minX).Append(" ").Append(maxX).Append("\n");
+            sb.Append("YRange:").Append(minY).Append(" ").Append(maxY).Append("\n");
+            sb.Append("ZRange:").Append(minZ).Append(" ").Append(maxZ).Append("\n");
+
+
+            sb.Append("pointDataRecordLength:").Append(pointDataRecordLength).Append("\n");
+            sb.Append("legacyNumofPointRecords:").Append(legacyNumofPointRecords).Append("\n");
+
+
+            sb.Append("startOfWaveFormDataPacketRecord:").Append(startOfWaveFormDataPacketRecord).Append("\n");
+            sb.Append("startOfFirstExtendedVariable:").Append(startOfFirstExtendedVariable).Append("\n");
+            sb.Append("numberOfExtendedVariableLength:").Append(numberOfExtendedVariableLength).Append("\n");
+            System.IO.File.WriteAllText(path, sb.ToString());
+        }
+#endif
     }
 }

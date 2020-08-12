@@ -1,8 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using Unity.Collections;
-using System;
+using PointCloud.LasFormat;
 
 namespace PointCloud
 {
@@ -14,7 +12,7 @@ namespace PointCloud
             public int bufferPoint;
             public int polyNum;
             public System.Action<GameObject> onInstansiatePart;
-            public System.Action onComplete;
+
 
             public void SetPointNum(ulong num,int reduction)
             {
@@ -60,6 +58,11 @@ namespace PointCloud
         private Config config;
         private Vector3[] normalVals;
         private bool isComplete = false;
+
+        public bool IsComplete
+        {
+            get { return this.isComplete; }
+        }
 
         public MeshGenerator(Transform parent, Material mat, Config conf)
         {
@@ -136,24 +139,24 @@ namespace PointCloud
             return true;
         }
 
-        public void UpdateFromMainThread()
+        public void UpdateFromMainThread(bool forceComplete = false)
         {
             if(this.isComplete) { return; }
-
-            if (this.vertBufferSize <= currentVertPos)
+            if (forceComplete)
             {
                 CreateObject();
-                this.currentIndexPos = 0;
-                this.currentVertPos = 0;
+                // complete
+                this.isComplete = true;
+                this.ReleaseBuffers();
+            }else if (this.vertBufferSize <= currentVertPos)
+            {
+                CreateObject();
             }
             else if (this.currentPointNum >= this.config.pointNum)
             {
                 CreateObject();
-                this.currentIndexPos = 0;
-                this.currentVertPos = 0;
                 // complete
                 this.isComplete = true;
-                this.config.onComplete?.Invoke();
                 this.ReleaseBuffers();
             }
         }
@@ -170,6 +173,10 @@ namespace PointCloud
             var renderer = gmo.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = this.drawMaterial;
             this.config.onInstansiatePart?.Invoke(gmo);
+
+
+            this.currentIndexPos = 0;
+            this.currentVertPos = 0;
         }
 
         private Mesh GenerateMesh()
