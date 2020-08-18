@@ -70,7 +70,7 @@ namespace PointCloud.LasFormat
                 readFunc(ref pointData,reader);
                 if (!isSetOffset)
                 {
-                    LasLoadBehaviour.CalcOffsetVector3Double(out offsetPos,ref header, ref pointData);
+                    LasLoadBehaviour.CalcOffsetForFloatPrecision(out offsetPos,ref header, ref pointData);
                     this.isSetOffset = true;
                 }
 

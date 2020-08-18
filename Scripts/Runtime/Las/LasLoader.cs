@@ -14,15 +14,14 @@ namespace PointCloud.LasFormat
             return lasLoader;
         }
 
-        public static LasLoadBehaviour InstanciateAndAsyncLoad(string path, Material mat, int reductionParam = 1, MeshGenerator.Config conf = default)
+        public static LasLoadBehaviour InstanciateAndAsyncLoad(string path, Material mat, int reductionParam = 1, MeshGenerator.Config conf = default,
+            System.Action<LasLoadBehaviour> onComplete = null)
         {
             GameObject gmo = new GameObject(GetFilename(path));
             var lasLoader = gmo.AddComponent<LasLoadBehaviour>();
             lasLoader.SetMaterial(mat);
-            lasLoader.LoadDataAsync(path, ref conf, reductionParam);
-#if DEBUG
-            lasLoader.HeaderInfo.DebugWriteToFile(path + "_header.txt");
-#endif
+            lasLoader.LoadDataAsync(path, ref conf, reductionParam, onComplete);
+
             return lasLoader;
         }
 

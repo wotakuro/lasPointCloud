@@ -20,7 +20,7 @@ namespace PointCloud.LasFormat
 
         private System.Action<LasLoadBehaviour> onComplete;
 
-        public Vector3Double OffsetPosition
+        public Vector3Double OffsetForFloatPrecision
         {
             get { return offsetPos; }
             set {
@@ -46,7 +46,7 @@ namespace PointCloud.LasFormat
             if (!this.isSetOffset && threadLoadExecutor != null 
                 && threadLoadExecutor.IsSetOffset)
             {
-                this.OffsetPosition = threadLoadExecutor.OffsetPosition;
+                this.OffsetForFloatPrecision = threadLoadExecutor.OffsetPosition;
             }
             if (this.meshGenerator != null)
             {
@@ -131,7 +131,7 @@ namespace PointCloud.LasFormat
                 readFunc(ref pointData,reader);
                 if (!isSetOffset)
                 {
-                    CalcOffsetVector3Double(out offsetPos, ref header, ref pointData);
+                    CalcOffsetForFloatPrecision(out offsetPos, ref header, ref pointData);
                     isSetOffset = true;
                 }
                 GetPointData(ref header, ref pointData,ref offsetPos, out point, out col);
@@ -150,12 +150,32 @@ namespace PointCloud.LasFormat
             meshGenerator.UpdateFromMainThread(true);
 
         }
-        public static void CalcOffsetVector3Double(out Vector3Double offset, 
+        public static void CalcOffsetForFloatPrecision(out Vector3Double offset, 
             ref PublicHeaderBlock header, ref PointDataFormat pointDataFormat)
         {
-            double x = (header.xScaleFactor * pointDataFormat.baseData.x);
-            double y = (header.yScaleFactor * pointDataFormat.baseData.y);
-            double z = (header.zScaleFactor * pointDataFormat.baseData.z);
+            double x = 0, y = 0, z=0;
+
+            if (header.xOffset == 0.0 &&
+                header.yOffset == 0.0 &&
+                header.zOffset == 0.0)
+            {
+                x = (header.xScaleFactor * pointDataFormat.baseData.x);
+                y = (header.yScaleFactor * pointDataFormat.baseData.y);
+                z = (header.zScaleFactor * pointDataFormat.baseData.z);
+            }
+            else
+            {
+                /*
+                x = (((header.minX + header.maxX) * 0.5));
+                y = (((header.minY + header.maxY) * 0.5));
+                z = (((header.minZ + header.maxZ) * 0.5));
+                */
+            }
+            /*
+            x -= header.xOffset;
+            y -= header.yOffset;
+            z -= header.zOffset;
+            */
 
             offset = new Vector3Double(x, y, z);
 
