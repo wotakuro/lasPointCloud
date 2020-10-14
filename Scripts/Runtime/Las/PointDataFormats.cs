@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,12 +19,62 @@ namespace PointCloud.LasFormat
         public byte userdata;
         public ushort pointSourceId;
 
+
         public bool ScanDirectionFlag
         {
             get {
                 var bit = (1 << 6);
                 return (flags & bit) == bit;
             }
+        }
+        public unsafe byte* Parse(byte* ptr, bool flagOneByte)
+        {
+            int* iPtr = (int*)ptr;
+            {
+                x = *iPtr;
+                ptr += 4;
+            }
+            {
+                iPtr = (int*)ptr;
+                y = *iPtr;
+                ptr += 4;
+            }
+            {
+                iPtr = (int*)ptr;
+                z = *iPtr;
+                ptr += 4;
+            }
+
+            ushort* usPtr = (ushort*)ptr;
+            intensity = *usPtr;
+            ptr += 2;
+
+            if (flagOneByte)
+            {
+                this.flags = *ptr;
+                ++ptr;
+            }
+            else
+            {
+                this.flagsExt = *ptr;
+                ++ptr;
+                this.flags = *ptr;
+                ++ptr;
+            }
+
+
+            this.classification = *ptr;
+            ++ptr;
+            this.scanAngleRank = *ptr;
+            ++ptr;
+            this.userdata = *ptr;
+            ++ptr;
+            {
+                usPtr = (ushort*)ptr;
+                this.pointSourceId = *usPtr;
+                ptr += 2;
+            }
+            return ptr;
         }
 
         public void Read(FileReader reader,bool flagOneByte)
@@ -60,6 +111,25 @@ namespace PointCloud.LasFormat
             green = reader.ReadUshort();
             blue = reader.ReadUshort();
         }
+        public unsafe byte* Parse(byte* ptr)
+        {
+            ushort* usPtr = (ushort*)ptr;
+            {
+                this.red = *usPtr;
+                ptr += 2;
+            }
+            {
+                usPtr = (ushort*)ptr;
+                this.green = *usPtr;
+                ptr += 2;
+            }
+            {
+                usPtr = (ushort*)ptr;
+                this.blue = *usPtr;
+                ptr += 2;
+            }
+            return ptr;
+        }
     }
     public struct WaveInfo
     {
@@ -91,7 +161,7 @@ namespace PointCloud.LasFormat
         }
     }
 
-    public struct PointDataFormat
+    public unsafe struct PointDataFormat
     {
         public delegate int PointReadDelegatge(ref PointDataFormat obj, FileReader reader);
 
@@ -101,6 +171,37 @@ namespace PointCloud.LasFormat
         public ParametricInfo parametric;
         public WaveInfo waveInfo;
 
+        private fixed byte buffer[96];
+
+        public static int GetExpectedSize(byte format)
+        {
+            switch (format)
+            {
+                case 0:
+                    return 20;
+                case 1:
+                    return 28;
+                case 2:
+                    return 26;
+                case 3:
+                    return 34;
+                case 4:
+                    return 57;
+                case 5:
+                    return 63;
+                case 6:
+                    return 30;
+                case 7:
+                    return 36;
+                case 8:
+                    return 38;
+                case 9:
+                    return 59;
+                case 10:
+                    return 67;
+            }
+            return 0;
+        }
 
         public static PointReadDelegatge GetReadAction(byte format)
         {
@@ -134,27 +235,52 @@ namespace PointCloud.LasFormat
 
         private static int ReadAsFormat0(ref PointDataFormat obj, FileReader reader)
         {
-            obj.baseData.Read(reader, true);
+            fixed (byte* ptr = &obj.buffer[0])
+            {
+                reader.ReadBytes(ptr, 20);
+                obj.baseData.Parse(ptr, true);
+            }
             return 0;
         }
 
         private static int ReadAsFormat1(ref PointDataFormat obj, FileReader reader)
         {
-            obj.baseData.Read(reader, true);
-            obj.GPSTime = reader.ReadDouble();
+            fixed (byte* ptr = &obj.buffer[0])
+            {
+                reader.ReadBytes(ptr, 28);
+                double* nextPtr = (double*)obj.baseData.Parse(ptr, true);
+                obj.GPSTime = *nextPtr;
+            }
             return 0;
         }
         private static int ReadAsFormat2(ref PointDataFormat obj, FileReader reader)
         {
+#if true
+            fixed (byte* ptr = &obj.buffer[0])
+            {
+
+                reader.ReadBytes(ptr, 26);
+                byte *nextPtr = obj.baseData.Parse(ptr, true);
+                obj.colorInfo.Parse(nextPtr);
+            }
+#else
+
             obj.baseData.Read(reader, true);
             obj.colorInfo.Read(reader);
+#endif
             return 0;
         }
         private static int ReadAsFormat3(ref PointDataFormat obj, FileReader reader)
         {
-            obj.baseData.Read(reader, true);
-            obj.GPSTime = reader.ReadDouble();
-            obj.colorInfo.Read(reader);
+            fixed (byte* ptr = &obj.buffer[0])
+            {
+                reader.ReadBytes(ptr, 34);
+                byte* nextPtr = obj.baseData.Parse(ptr, true);
+                double* dPtr = (double*)nextPtr;
+                obj.GPSTime = *dPtr;
+                nextPtr += 8;
+                obj.colorInfo.Parse(nextPtr);
+            }
 
             return 0;
         }

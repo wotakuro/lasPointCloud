@@ -44,10 +44,15 @@ namespace PointCloud
         public unsafe void ReadBytes(byte* ptr,int length)
         {
             ReadToBuffer(length);
-            for(int i = 0;i < length; ++i)
+            fixed (byte* bufPtr = &buffer[0])
             {
-                *ptr = buffer[i];
-                ptr += 1;
+                byte* rPtr = bufPtr;
+                for (int i = 0; i < length; ++i)
+                {
+                    *ptr = *rPtr;
+                    ptr += 1;
+                    rPtr += 1;
+                }
             }
         }
 

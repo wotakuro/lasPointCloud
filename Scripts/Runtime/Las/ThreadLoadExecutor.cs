@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Profiling;
+
 namespace PointCloud.LasFormat
 {
     class ThreadLoadExecutor : IDisposable
@@ -11,6 +13,11 @@ namespace PointCloud.LasFormat
         private MeshGenerator meshGenerator;
         private int reductionParam;
         private System.Threading.Thread thread;
+
+#if DEBUG
+        private CustomSampler waitForCustomSampler = CustomSampler.Create("waitFor");
+        private CustomSampler execPointCustomSampler = CustomSampler.Create("ExecutePoint");
+#endif
 
 
         private Vector3Double offsetPos;
@@ -43,6 +50,7 @@ namespace PointCloud.LasFormat
         public void StartExecute()
         {
             thread = new System.Threading.Thread(this.Execute);
+            thread.Priority = System.Threading.ThreadPriority.AboveNormal;
             thread.Start();
         }
         public void Dispose()
@@ -67,6 +75,10 @@ namespace PointCloud.LasFormat
 
             for (ulong i = 0; i < num; ++i)
             {
+#if DEBUG
+                execPointCustomSampler.Begin();
+#endif
+
                 readFunc(ref pointData,reader);
                 if (!isSetOffset)
                 {
@@ -78,14 +90,24 @@ namespace PointCloud.LasFormat
                 // append 出来るまで実行
                 while (!meshGenerator.AddPointData(point, col))
                 {
+#if DEBUG
+                    waitForCustomSampler.Begin();
+#endif
                     System.Threading.Thread.Sleep(2);
+#if DEBUG
+                    waitForCustomSampler.End();
+#endif
                 }
                 // reduction
-                if(this.reductionParam > 0)
+                if (this.reductionParam > 0)
                 {
                     reader.Skip(this.reductionParam * header.pointDataRecordLength);
                     i += (ulong)this.reductionParam;
                 }
+
+#if DEBUG
+                execPointCustomSampler.End();
+#endif
             }
 
         }
