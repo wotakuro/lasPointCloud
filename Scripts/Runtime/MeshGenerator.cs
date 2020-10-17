@@ -1,6 +1,8 @@
 ﻿using UnityEngine;
 using Unity.Collections;
 using PointCloud.LasFormat;
+using UnityEngine.Rendering;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace PointCloud
 {
@@ -30,7 +32,7 @@ namespace PointCloud
             {
                 if (this.bufferPoint <= 0)
                 {
-                    this.bufferPoint = 200000;
+                    this.bufferPoint = 50000;
                 }
                 if (this.polyNum < 3)
                 {
@@ -43,9 +45,24 @@ namespace PointCloud
             }
         }
 
-        private NativeArray<Vector3> pointBuffer;
-        private NativeArray<Vector3> normalBuffer;
-        private NativeArray<Color> colorBuffer;
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        struct VertexParam
+        {
+            public Vector3 pos;
+            public float normalX, normalY;
+            public Color32 color;
+
+            public void SetData( ref Vector3 p,float nx,float ny,ref Color32 c)
+            {
+                pos = p;
+                normalX = nx;
+                normalY = ny;
+                color = c;
+            }
+        }
+
+        private NativeArray<VertexParam> vertexBuffer;
+
         private NativeArray<int> indexBuffer;
 
         private ulong currentPointNum = 0;
@@ -58,6 +75,13 @@ namespace PointCloud
         private Config config;
         private Vector3[] normalVals;
         private bool isComplete = false;
+
+        static VertexAttributeDescriptor[] vertLayout = new[] {
+            new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3),
+            new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 2),
+            new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4),
+        };
+
 
         public bool IsComplete
         {
@@ -76,9 +100,7 @@ namespace PointCloud
             this.vertBufferSize = conf.bufferPoint * conf.polyNum;
 
             // initBuffer
-            this.pointBuffer = new NativeArray<Vector3>(vertBufferSize, Allocator.Persistent);
-            this.normalBuffer = new NativeArray<Vector3>(vertBufferSize, Allocator.Persistent);
-            this.colorBuffer = new NativeArray<Color>(vertBufferSize, Allocator.Persistent);
+            this.vertexBuffer = new NativeArray<VertexParam>(vertBufferSize, Allocator.Persistent);
             this.InitIndexBuffer();
         }
 
@@ -115,7 +137,7 @@ namespace PointCloud
             }
         }
 
-        public bool AddPointData(Vector3 point, Color col)
+        public bool AddPointData(Vector3 point, Color32 col)
         {
             if (this.isComplete) { return true; }
             if (this.currentPointNum >= this.config.pointNum)
@@ -126,11 +148,17 @@ namespace PointCloud
             {
                 return false;
             }
+            VertexParam vertexParam;
             for (int i = 0; i < this.config.polyNum; ++i)
             {
-                pointBuffer[currentVertPos] = point;
-                normalBuffer[currentVertPos] = normalVals[i];
-                colorBuffer[currentVertPos] = col;
+                vertexParam = new VertexParam()
+                {
+                    pos = point,
+                    color = col,
+                    normalX = normalVals[i].x,
+                    normalY = normalVals[i].y,
+                };
+                vertexBuffer[currentVertPos] = vertexParam;
                 ++currentVertPos;
             }
             this.currentIndexPos += (this.config.polyNum-2)*3;
@@ -181,11 +209,18 @@ namespace PointCloud
 
         private Mesh GenerateMesh()
         {
+
+
             Mesh mesh = new Mesh();
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.SetVertexBufferParams(this.currentVertPos, vertLayout);
+            mesh.SetVertexBufferData(this.vertexBuffer, 0, 0, this.currentVertPos);
+            /*
             mesh.SetVertices(pointBuffer, 0, this.currentVertPos);
             mesh.SetNormals(normalBuffer, 0, this.currentVertPos);
             mesh.SetColors(colorBuffer, 0, this.currentVertPos);
+            */
+
             mesh.SetIndices(indexBuffer, 0, this.currentIndexPos, MeshTopology.Triangles, 0);
             mesh.RecalculateBounds();
             mesh.UploadMeshData(true);
@@ -197,17 +232,9 @@ namespace PointCloud
             ReleaseBuffers();
         }
         private void ReleaseBuffers() {
-            if (normalBuffer.IsCreated)
+            if (vertexBuffer.IsCreated)
             {
-                normalBuffer.Dispose();
-            }
-            if (pointBuffer.IsCreated)
-            {
-                pointBuffer.Dispose();
-            }
-            if (colorBuffer.IsCreated)
-            {
-                colorBuffer.Dispose();
+                vertexBuffer.Dispose();
             }
             if (indexBuffer.IsCreated)
             {

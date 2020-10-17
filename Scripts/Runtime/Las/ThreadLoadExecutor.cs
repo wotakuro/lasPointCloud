@@ -14,7 +14,7 @@ namespace PointCloud.LasFormat
         private int reductionParam;
         private System.Threading.Thread thread;
 
-#if DEBUG
+#if DEBUG_PROFILING
         private CustomSampler waitForCustomSampler = CustomSampler.Create("waitFor");
         private CustomSampler execPointCustomSampler = CustomSampler.Create("ExecutePoint");
 #endif
@@ -67,7 +67,7 @@ namespace PointCloud.LasFormat
             byte format = header.pointDatRecordFormat;
             ulong num = header.legacyNumofPointRecords;
             Vector3 point;
-            Color col;
+            Color32 col;
 
             PointDataFormat pointData = new PointDataFormat();
 
@@ -75,7 +75,7 @@ namespace PointCloud.LasFormat
 
             for (ulong i = 0; i < num; ++i)
             {
-#if DEBUG
+#if DEBUG_PROFILING
                 execPointCustomSampler.Begin();
 #endif
 
@@ -90,11 +90,11 @@ namespace PointCloud.LasFormat
                 // append 出来るまで実行
                 while (!meshGenerator.AddPointData(point, col))
                 {
-#if DEBUG
+#if DEBUG_PROFILING
                     waitForCustomSampler.Begin();
 #endif
                     System.Threading.Thread.Sleep(2);
-#if DEBUG
+#if DEBUG_PROFILING
                     waitForCustomSampler.End();
 #endif
                 }
@@ -105,7 +105,7 @@ namespace PointCloud.LasFormat
                     i += (ulong)this.reductionParam;
                 }
 
-#if DEBUG
+#if DEBUG_PROFILING
                 execPointCustomSampler.End();
 #endif
             }

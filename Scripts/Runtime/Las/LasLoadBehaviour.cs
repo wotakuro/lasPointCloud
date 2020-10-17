@@ -118,7 +118,7 @@ namespace PointCloud.LasFormat
             byte format = header.pointDatRecordFormat;
             ulong num = header.legacyNumofPointRecords;
             Vector3 point;
-            Color col;
+            Color32 col;
 
             conf.SetPointNum( num , reductionParam);
             this.meshGenerator = new MeshGenerator(transform,material, conf);
@@ -182,7 +182,7 @@ namespace PointCloud.LasFormat
         }
 
         public static void GetPointData(ref PublicHeaderBlock header,ref PointDataFormat pointDataFormat,
-            ref Vector3Double offset, out Vector3 pos,out Color col)
+            ref Vector3Double offset, out Vector3 pos,out Color32 col)
         {
             double x = (header.xScaleFactor * pointDataFormat.baseData.x) - offset.x;
             double y = (header.yScaleFactor * pointDataFormat.baseData.y) - offset.y;
